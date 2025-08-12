@@ -1,31 +1,25 @@
-/* This is the main container for our piano */
 #piano-container {
     align: center middle;
     layout: horizontal;
     background: #444;
     border: round #222;
-    height: 14; /* Slightly taller for better proportions */
-    width: 99;  /* Adjusted to fit the new key widths */
+    height: 14;
+    /* Widened to fit the final keys */
+    width: 135;
 }
-
-/* Base style for all keys */
 .key {
     height: 100%;
     border: solid #222;
 }
-
-/* Style for the white keys */
 .white_key {
-    width: 9; /* Wider white keys */
+    width: 9;
     background: white;
     color: gray;
     text-align: center;
     padding-top: 10;
 }
-
-/* Style for the black keys */
 .black_key {
-    width: 6; /* Wider black keys */
+    width: 6;
     height: 65%;
     background: #111;
     border: solid #333;
@@ -35,17 +29,18 @@
     padding-top: 4;
 }
 
-/*
-Recalculated offsets for precise positioning.
-*/
-#C-sharp-4 { offset-x: 6; }
-#D-sharp-4 { offset-x: 15; }
-#F-sharp-4 { offset-x: 33; }
-#G-sharp-4 { offset-x: 42; }
-#A-sharp-4 { offset-x: 51; }
-#C-sharp-5 { offset-x: 69; }
-#D-sharp-5 { offset-x: 78; }
+/* Black key offsets for the C3 and C4 octaves */
+#C-sharp-3 { offset-x: 6; }
+#D-sharp-3 { offset-x: 15; }
+#F-sharp-3 { offset-x: 33; }
+#G-sharp-3 { offset-x: 42; }
+#A-sharp-3 { offset-x: 51; }
 
-.key-group {
-    width: 9; /* Same width as a white key */
-}
+#C-sharp-4 { offset-x: 69; }
+#D-sharp-4 { offset-x: 78; }
+#F-sharp-4 { offset-x: 96; }
+#G-sharp-4 { offset-x: 105; }
+#A-sharp-4 { offset-x: 114; }
+
+/* --- NEW RULE FOR THE LAST BLACK KEY --- */
+#C-sharp-5 { offset-x: 132; }
