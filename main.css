@@ -44,3 +44,18 @@
 
 /* --- NEW RULE FOR THE LAST BLACK KEY --- */
 #C-sharp-5 { offset-x: 132; }
+
+
+/* Container for the new controls */
+#controls-container {
+    height: auto;
+    padding: 1;
+    layout: horizontal;
+    align: center top;
+}
+
+/* Style for the sustain switch */
+#sustain-switch {
+    height: 3;
+    width: auto;
+}
