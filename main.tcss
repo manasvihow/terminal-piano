@@ -1,0 +1,89 @@
+/* main.tcss (Final Docking Version) */
+
+#centering-grid {
+    /* This container now fills all available space vertically and horizontally */
+    width: 100%;
+    height: 100%;
+
+    /* Its internal grid still centers the piano */
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 1fr auto 1fr;
+    
+    /* This pushes the piano to the bottom of the available space */
+    align: center bottom;
+}
+
+#piano-container {
+    /* It is automatically placed in column 2 by the Python code */
+    
+    /* --- Using a precise, calculated width for your keys --- */
+    width: 137;
+    height: 14;
+
+    /* Your other styles are preserved */
+    layout: horizontal;
+    background: #2d3436;
+}
+
+/* --- FINAL FIX: Docking the controls to the top of the screen --- */
+#controls-container {
+    dock: top;
+    width: 100%;
+    height: auto;
+    padding: 1; 
+}
+
+#sustain-switch {
+    height: 3;
+    width: auto;
+    margin-left: 2;
+}
+
+/*
+ * ===================================================================
+ * Piano Key Styling (Unchanged)
+ * ===================================================================
+ */
+.key {
+    height: 100%;
+    text-align: center;
+    text-style: bold;
+}
+.key--white {
+    width: 8;
+    background: #dfe6e9;
+    color: #2d3436;
+    padding-top: 10;
+    margin-right: 1;
+}
+.key--black {
+    width: 5;
+    height: 60%;
+    background: #2d3436;
+    color: #dfe6e9;
+    position: absolute;
+}
+.key--pressed {
+    background: #fdcb6e;
+    color: #2d3436;
+}
+
+/*
+ * ===================================================================
+ * Black Key Positioning (Unchanged)
+ * ===================================================================
+ */
+#C-sharp-3 { offset-x: 6; }
+#D-sharp-3 { offset-x: 15; }
+#F-sharp-3 { offset-x: 33; }
+#G-sharp-3 { offset-x: 42; }
+#A-sharp-3 { offset-x: 51; }
+
+#C-sharp-4 { offset-x: 69; }
+#D-sharp-4 { offset-x: 78; }
+#F-sharp-4 { offset-x: 96; }
+#G-sharp-4 { offset-x: 105; }
+#A-sharp-4 { offset-x: 114; }
+
+#C-sharp-5 { offset-x: 132; }

@@ -1,17 +1,17 @@
 import os
-# This ensures the soundfont file path is correct
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 from dotenv import load_dotenv
 load_dotenv()
 
 from fluidsynth import Synth
-
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Header, Footer, Static, Label, Switch
-from textual.events import Click, Key # Simplified imports
+from textual.events import Key
+from textual.reactive import reactive
+from textual.dom import NoMatches
 
-# NOTE_TO_MIDI dictionary is unchanged
+# NOTE: The NOTE_TO_MIDI dictionary remains unchanged.
 NOTE_TO_MIDI = {
     "C3": 48, "C#3": 49, "D3": 50, "D#3": 51, "E3": 52,
     "F3": 53, "F#3": 54, "G3": 55, "G#3": 56, "A3": 57,
@@ -21,147 +21,144 @@ NOTE_TO_MIDI = {
 }
 
 class PianoKey(Static):
-    """A single piano key widget."""
+    """A single piano key widget that knows its own state."""
     def __init__(self, note: str, keyboard_key: str, is_black: bool, **kwargs) -> None:
         super().__init__(keyboard_key, **kwargs)
         self.note = note
         self.keyboard_key = keyboard_key
         self.is_black = is_black
         self.add_class("key")
-        self.add_class("black_key" if is_black else "white_key")
+        self.add_class("key--black" if is_black else "key--white")
 
-    def on_click(self, event: Click) -> None:
-        # Simplified call, no longer needs to specify it's a mouse click
+    def on_click(self) -> None:
         self.app.handle_note_press(self.note)
-        event.stop()
 
 class PianoApp(App):
-    """A terminal piano application."""
-    CSS_PATH = "main.css"
+    """A terminal piano application using idiomatic Textual features."""
+    CSS_PATH = "main.tcss"
+    
+    # --- UPDATED: More keys have been mapped for the C4 octave ---
     KEY_MAP = {
         'a': "C3", 'w': "C#3", 's': "D3", 'e': "D#3", 'd': "E3",
         'f': "F3", 't': "F#3", 'g': "G3", 'y': "G#3", 'h': "A3",
         'u': "A#3", 'j': "B3",
+        'k': "C4", 'o': "C#4", 'l': "D4", 'p': "D#4", ';': "E4",
+        "'": "F4", '[': "F#4", ']': "G4", '\\': "G#4",
     }
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("tab", "toggle_sustain", "Sustain"),
+        ("tab", "toggle_sustain", "Sustain On/Off"),
         ("ctrl+k", "toggle_keyboard", "Keyboard On/Off")
     ]
 
+    sustain_on = reactive(False)
+    keyboard_active = reactive(True)
+
     def __init__(self):
         super().__init__()
-        self.sustain_on = False
-        self.keyboard_active = True
-        
         self.fs = Synth()
-        # On Windows, use 'dsound'. On Linux, 'alsa' or 'pulseaudio'. 'coreaudio' for macOS.
-        self.fs.start(driver='coreaudio') 
+        self.fs.start(driver='coreaudio')
         sfid = self.fs.sfload("assets/sounds/GeneralUser.sf2")
         self.fs.program_select(0, sfid, 0, 0)
-        
+
     def on_unmount(self) -> None:
         self.fs.delete()
 
-    # --- NEW: TEXTUAL'S NATIVE KEY HANDLER ---
-    # --- NEW: TEXTUAL'S NATIVE KEY HANDLER ---
+    def watch_sustain_on(self, sustain_on: bool) -> None:
+        sustain_value = 127 if sustain_on else 0
+        self.fs.cc(0, 64, sustain_value)
+        if not sustain_on:
+            self.fs.all_notes_off(0)
+            for key_widget in self.query(".key--pressed"):
+                key_widget.remove_class("key--pressed")
+
+    def watch_keyboard_active(self, keyboard_active: bool) -> None:
+        new_title = "A Piano in Your Terminal" if keyboard_active else "Keyboard OFF (Press Ctrl+K)"
+        self.query_one(Header).sub_title = new_title
+
+    # --- FIX: The Tab key is now explicitly handled here to override default focus behavior ---
     def on_key(self, event: Key) -> None:
-        """Handles key presses at the application level."""
-        
-        # First, explicitly check for the tab key to handle the binding
+        """Handles key presses."""
+        # Handle the sustain toggle binding manually to prevent focus switching.
         if event.key == "tab":
             self.action_toggle_sustain()
-            event.stop() # Prevent the default tab-to-focus behavior
-            return       # Stop processing here
-
-        # If it wasn't tab, proceed with piano key logic
-        if not self.keyboard_active:
+            event.stop()  # Stop the event from bubbling up
             return
 
-        if event.key in self.KEY_MAP:
+        # Handle piano key presses
+        if self.keyboard_active and event.key in self.KEY_MAP:
             note = self.KEY_MAP[event.key]
             self.handle_note_press(note)
-            event.stop() # Good practice to stop the event after handling
 
-    # --- SIMPLIFIED AND UNIFIED NOTE HANDLING ---
     def handle_note_press(self, note: str):
-        """Turns a note's audio and visuals ON."""
+        midi_note = NOTE_TO_MIDI.get(note)
+        if midi_note is None:
+            return
+
         note_id = note.replace("#", "-sharp-")
         try:
             key_widget = self.query_one(f"#{note_id}", PianoKey)
-            midi_note = NOTE_TO_MIDI.get(note)
-
-            if midi_note is None:
-                return
-
+            key_widget.add_class("key--pressed")
             self.fs.noteon(0, midi_note, 100)
-            key_widget.styles.background = "gold"
 
             if self.sustain_on:
-                # With sustain, flash the key but let the audio continue.
-                self.set_timer(0.2, lambda: self.reset_key_visual(key_widget))
+                self.set_timer(0.2, lambda: key_widget.remove_class("key--pressed"))
             else:
-                # No sustain: play for a fixed duration and then release.
-                # This works for both mouse clicks and keyboard presses.
                 self.set_timer(0.5, lambda: self.handle_note_release(note))
-        except:
-            pass
+        except NoMatches:
+            self.log(f"Warning: No widget found for note {note}")
 
     def handle_note_release(self, note: str):
-        """Turns a note's audio and visuals OFF."""
+        midi_note = NOTE_TO_MIDI.get(note)
         note_id = note.replace("#", "-sharp-")
         try:
             key_widget = self.query_one(f"#{note_id}", PianoKey)
-            midi_note = NOTE_TO_MIDI.get(note)
+            key_widget.remove_class("key--pressed")
             if midi_note is not None:
                 self.fs.noteoff(0, midi_note)
-                self.reset_key_visual(key_widget)
-        except:
+        except NoMatches:
             pass
 
-    def reset_key_visual(self, key_widget: PianoKey):
-        """Helper to only reset a key's color."""
-        key_widget.styles.background = "black" if key_widget.is_black else "white"
-
-    # --- ACTIONS AND WIDGET EVENTS (NO LONGER NEED THREADING) ---
     def on_switch_changed(self, event: Switch.Changed) -> None:
-        """Called when the sustain switch is toggled by mouse."""
         if event.switch.id == "sustain-switch":
             self.sustain_on = event.value
-            self.update_sustain_state()
 
     def action_toggle_sustain(self) -> None:
-        """Action for the Tab key binding."""
         self.query_one("#sustain-switch", Switch).toggle()
 
-    def update_sustain_state(self):
-        """Central method to update the synthesizer and visuals."""
-        sustain_value = 127 if self.sustain_on else 0
-        self.fs.cc(0, 64, sustain_value)
-        if not self.sustain_on:
-            self.fs.all_notes_off(0)
-            for key_widget in self.query(PianoKey):
-                self.reset_key_visual(key_widget)
-
     def action_toggle_keyboard(self) -> None:
-        """Toggles keyboard input."""
         self.keyboard_active = not self.keyboard_active
-        header = self.query_one(Header)
-        header.sub_title = "A Piano in Your Terminal" if self.keyboard_active else "Keyboard OFF (Press Ctrl+K)"
 
     def compose(self) -> ComposeResult:
+        """Create child widgets for the app."""
         yield Header()
+
+        # --- FINAL FIX: Controls are now docked via CSS ---
         with Horizontal(id="controls-container"):
             yield Label("Sustain:")
             yield Switch(id="sustain-switch")
-        with Container(id="piano-container"):
-            for note in NOTE_TO_MIDI:
-                key_char = next((k for k, v in self.KEY_MAP.items() if v == note), "")
-                is_black = "#" in note
-                note_id = note.replace("#", "-sharp-")
-                yield PianoKey(note, key_char, is_black, id=note_id)
-        yield Footer()
         
+        # The grid will fill the remaining space
+        with Container(id="centering-grid"):
+            yield Static()  # Left spacer
+            with Container(id="piano-container"):
+                # First, draw all the WHITE keys
+                for note in NOTE_TO_MIDI:
+                    if "#" not in note:
+                        key_char = next((k for k, v in self.KEY_MAP.items() if v == note), "")
+                        note_id = note.replace("#", "-sharp-")
+                        yield PianoKey(note, key_char, is_black=False, id=note_id)
+
+                # Second, draw all the BLACK keys on top
+                for note in NOTE_TO_MIDI:
+                    if "#" in note:
+                        key_char = next((k for k, v in self.KEY_MAP.items() if v == note), "")
+                        note_id = note.replace("#", "-sharp-")
+                        yield PianoKey(note, key_char, is_black=True, id=note_id)
+            yield Static()  # Right spacer
+
+        yield Footer()
+
 if __name__ == "__main__":
     app = PianoApp()
     app.run()
