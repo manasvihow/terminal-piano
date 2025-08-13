@@ -79,6 +79,8 @@ class PianoApp(App):
         self.song_data = TWINKLE_TWINKLE
         self.key_positions = {}
         self.fall_speed = 5.0
+        # Controller 64 is the sustain pedal, value 127 is "on".
+        self.fs.cc(0, 64, 127)
         
         # --- NEW: Game state variables, including score ---
         self.score = 0
