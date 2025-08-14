@@ -1,46 +1,47 @@
-/* main.tcss (Compact 4-Octave Piano Version) */
+/* main.tcss (with new controls) */
 
 #centering-grid {
     width: 100%; height: 100%;
-    layout: grid; grid-size: 3;
-    grid-columns: 1fr auto 1fr;
+    layout: grid; grid-size: 1;
+    align: center bottom;
 }
-#game-area {
-    layout: vertical; align: center bottom;
-    height: 100%;
-}
-#note-area {
-    width: 173; /* UPDATED: Width for compact piano */
-    height: 1fr;
-    background: #1e1e1e; border: wide #4a4a4a;
-    overflow: hidden;
-}
-.white-note { background: #00aaff; width: 5; } /* UPDATED: Thinner note */
-.black-note { background: #ff55aa; width: 3; } /* UPDATED: Thinner note */
-.white-note, .black-note {
-    position: absolute; border: round white;
-}
+#piano-area { height: auto; width: auto; }
 #piano-container {
-    width: 173; /* UPDATED: Width for compact piano */
-    height: 14;
+    width: 173; height: 14;
     layout: horizontal; background: #2d3436;
 }
 #controls-container {
     dock: top; width: 100%;
     height: auto; padding: 1;
+    align: center top;
+    /* NEW: Use a grid for nice alignment of multiple controls */
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 1fr 2fr 2fr;
+    grid-gutter: 1 4;
 }
+
+/* --- NEW: Styles for the new controls --- */
+#sustain-switch { height: 3; width: auto; margin-left: 2; }
+#instrument-select { width: 100%; }
+#volume-slider { width: 100%; }
+
+/* --- Slider styles (from your provided code) --- */
+Slider { height: 3; }
+Slider:focus { background: $primary-lighten-1; }
+
+
+/* Key styling is unchanged */
 .key {
     height: 100%; text-align: center; text-style: bold;
 }
 .key--white {
-    width: 5; /* UPDATED: Thinner white key */
-    background: #dfe6e9;
+    width: 5; background: #dfe6e9;
     color: #2d3436; padding-top: 10;
     margin-right: 1;
 }
 .key--black {
-    width: 3; /* UPDATED: Thinner black key */
-    height: 60%;
+    width: 3; height: 60%;
     background: #2d3436; color: #dfe6e9;
     position: absolute;
 }
@@ -48,25 +49,22 @@
     background: #fdcb6e; color: #2d3436;
 }
 
-/* --- UPDATED: All offsets recalculated for the new compact size --- */
+/* Black key offsets are unchanged */
 #C-sharp-3 { offset-x: 4; }
 #D-sharp-3 { offset-x: 10; }
 #F-sharp-3 { offset-x: 22; }
 #G-sharp-3 { offset-x: 28; }
 #A-sharp-3 { offset-x: 34; }
-
 #C-sharp-4 { offset-x: 46; }
 #D-sharp-4 { offset-x: 52; }
 #F-sharp-4 { offset-x: 64; }
 #G-sharp-4 { offset-x: 70; }
 #A-sharp-4 { offset-x: 76; }
-
 #C-sharp-5 { offset-x: 88; }
 #D-sharp-5 { offset-x: 94; }
 #F-sharp-5 { offset-x: 106; }
 #G-sharp-5 { offset-x: 112; }
 #A-sharp-5 { offset-x: 118; }
-
 #C-sharp-6 { offset-x: 130; }
 #D-sharp-6 { offset-x: 136; }
 #F-sharp-6 { offset-x: 148; }
