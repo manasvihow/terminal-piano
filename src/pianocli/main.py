@@ -1,6 +1,7 @@
 import os
 import time
 import typer
+from appdirs import user_data_dir
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.dom import NoMatches
@@ -11,6 +12,38 @@ from textual.css.query import NoMatches as NoMatchesError
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 from fluidsynth import Synth
+
+_APP_DIR = os.path.dirname(__file__)
+
+APP_NAME = "PianoCLI"
+APP_AUTHOR = "Manasvi"
+SOUNDFONT_NAME = "GeneralUser.sf2"
+SOUNDFONT_URL = ""
+
+DATA_DIR = user_data_dir(APP_NAME, APP_AUTHOR)
+SOUNDFONT_PATH = os.path.join(DATA_DIR, SOUNDFONT_NAME)
+
+def ensure_soundfont_exists():
+    """Checks if the soundfont exists, and downloads it if it doesn't."""
+    if os.path.exists(SOUNDFONT_PATH):
+        return # All good
+    
+    print(f"Soundfont not found. Downloading {SOUNDFONT_NAME} to {DATA_DIR}...")
+    print(f"URL: {SOUNDFONT_URL}")
+    
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with requests.get(SOUNDFONT_URL, stream=True) as r:
+            r.raise_for_status()
+            with open(SOUNDFONT_PATH, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        print("Download complete!")
+    except Exception as e:
+        print(f"Error downloading soundfont: {e}")
+        print("Please check your internet connection or download the file manually to the path above.")
+        exit()
+
 
 GENERAL_MIDI_INSTRUMENTS = [
     "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
@@ -60,7 +93,6 @@ class PianoKey(Static):
 
 
 class PianoApp(App):
-    """An interactive terminal piano with octave shifting."""
     CSS_PATH = "main.tcss"
     KEY_MAP = {
         'z': "C3", 'x': "D3", 'c': "E3", 'v': "F3", 'b': "G3", 'n': "A3", 'm': "B3",
@@ -80,10 +112,11 @@ class PianoApp(App):
 
     def __init__(self):
         super().__init__()
+        ensure_soundfont_exists()
         self.fs = Synth()
         self.fs.setting('synth.polyphony', 64)
         self.fs.start(driver='coreaudio')
-        self.sfid = self.fs.sfload("assets/sounds/GeneralUser.sf2")
+        self.sfid = self.fs.sfload(SOUNDFONT_PATH)
         self.fs.program_select(0, self.sfid, 0, 0)
         self.held_keys = set()
         self.note_off_timers = {}
