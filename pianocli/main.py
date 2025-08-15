@@ -1,18 +1,18 @@
 import os
 import time
+import typer  
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.dom import NoMatches
 from textual.events import Key
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Label, Static, Switch, Select
-from textual.css.query import NoMatches as NoMatchesError # For older Textual versions
+from textual.css.query import NoMatches as NoMatchesError
 
-# This setup can be at the top
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 from fluidsynth import Synth
 
-# The list of instruments you provided
+# (All your data lists and widget classes are unchanged)
 GENERAL_MIDI_INSTRUMENTS = [
     "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
     "Electric Piano 1", "Electric Piano 2", "Harpsichord", "Clavi", "Celesta", "Glockenspiel",
@@ -46,6 +46,37 @@ NOTE_TO_MIDI = {
     "G#5": 80, "A5": 81, "A#5": 82, "B5": 83, "C6": 84, "C#6": 85, "D6": 86, "D#6": 87,
     "E6": 88, "F6": 89, "F#6": 90, "G6": 91, "G#6": 92, "A6": 93, "A#6": 94, "B6": 95, "C7": 96
 }
+_NAKED_SLIDER = "╷         ╷         ╷\n├─┼─┼─┼─┼─┼─┼─┼─┼─┼─┤\n╵         ╵         ⵨"
+class Slider(Static):
+    position = reactive(0)
+    def __init__(self, position=0, **kwargs):
+        super().__init__(_NAKED_SLIDER, **kwargs)
+        self.position = position
+    def on_mount(self) -> None:
+        self.watch_position(self.position)
+    def watch_position(self, position: int) -> None:
+        self.styles.padding = (0, 0, 0, position)
+        
+class LabeledSlider(Static):
+    class Changed(Static.Changed): pass
+    value = reactive(0)
+    def __init__(self, label, value=100, value_range=(0, 127), id=""):
+        super().__init__(id=id)
+        self.label = label
+        self.min_value, self.max_value = value_range
+        self.value = value
+    def compose(self) -> ComposeResult:
+        initial_pos = self.value * 20 // (self.max_value - self.min_value)
+        yield Label(self.label)
+        yield Slider(position=initial_pos)
+    def on_key(self, event: Key) -> None:
+        slider = self.query_one(Slider)
+        if event.key == "left":
+            slider.position = max(0, slider.position - 1)
+        elif event.key == "right":
+            slider.position = min(20, slider.position + 1)
+        self.value = slider.position * (self.max_value - self.min_value) // 20
+        self.post_message(self.Changed(self))
 
 
 class PianoKey(Static):
@@ -61,7 +92,10 @@ class PianoKey(Static):
 
 
 class PianoApp(App):
-    """An interactive terminal piano with octave shifting."""
+    # (The entire PianoApp class from before goes here, unchanged)
+    # ...
+    # ...
+    """An interactive terminal piano with more options."""
     CSS_PATH = "main.tcss"
     KEY_MAP = {
         'z': "C3", 'x': "D3", 'c': "E3", 'v': "F3", 'b': "G3", 'n': "A3", 'm': "B3",
@@ -72,12 +106,9 @@ class PianoApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "toggle_sustain", "Sustain"),
-        ("up", "octave_up", "Octave +"),
-        ("down", "octave_down", "Octave -"),
     ]
 
     sustain_on = reactive(False)
-    octave_shift = reactive(0)
 
     def __init__(self):
         super().__init__()
@@ -89,13 +120,15 @@ class PianoApp(App):
         self.held_keys = set()
         self.note_off_timers = {}
 
-    def watch_octave_shift(self, new_shift: int) -> None:
-        """Update the header to show the current octave shift."""
-        header = self.query_one(Header)
-        if new_shift == 0:
-            header.sub_title = ""
-        else:
-            header.sub_title = f"Octave Shift: {new_shift:+.0f}"
+    def on_mount(self) -> None:
+        """Called when the app is ready."""
+        # --- FIX: Start "watching" the volume slider for changes ---
+        self.watch(self.query_one("#volume-slider"), "value", self.on_volume_changed)
+
+    # --- FIX: This is the new callback for the volume watcher ---
+    def on_volume_changed(self, new_value: int) -> None:
+        """Called automatically when the volume slider's value changes."""
+        self.fs.cc(0, 7, new_value) # Controller 7 is the MIDI volume
 
     def watch_sustain_on(self, sustain_on: bool) -> None:
         if not sustain_on:
@@ -112,14 +145,6 @@ class PianoApp(App):
             self.fs.program_select(0, self.sfid, 0, program_id)
             self.fs.all_notes_off(0)
 
-    def action_octave_up(self) -> None:
-        """Shifts the piano up by one octave."""
-        self.octave_shift += 1
-
-    def action_octave_down(self) -> None:
-        """Shifts the piano down by one octave."""
-        self.octave_shift -= 1
-
     def action_toggle_sustain(self) -> None:
         self.query_one("#sustain-switch", Switch).toggle()
 
@@ -130,18 +155,10 @@ class PianoApp(App):
             self.handle_player_note_press(self.KEY_MAP[event.key])
 
     def handle_player_note_press(self, note: str):
-        """Plays a note, applying the current octave shift."""
-        note_name = note[:-1]
-        original_octave = int(note[-1])
-        shifted_octave = original_octave + self.octave_shift
-        shifted_note = f"{note_name}{shifted_octave}"
+        midi_note = NOTE_TO_MIDI.get(note)
+        if midi_note is None: return
 
-        midi_note = NOTE_TO_MIDI.get(shifted_note)
-        if midi_note is None: # The shifted note is off the piano
-            return
-        
-        if midi_note in self.held_keys:
-            return
+        if midi_note in self.held_keys: return
 
         self.held_keys.add(midi_note)
         
@@ -164,7 +181,6 @@ class PianoApp(App):
 
         self.set_timer(0.1, lambda n=midi_note: self.held_keys.discard(n))
 
-        # Visually flash the BASE key, not the shifted one
         note_id = note.replace("#", "-sharp-")
         try:
             key_widget = self.query_one(f"#{note_id}", PianoKey)
@@ -183,6 +199,8 @@ class PianoApp(App):
             instrument_options = [(name, i) for i, name in enumerate(GENERAL_MIDI_INSTRUMENTS)]
             yield Select(instrument_options, id="instrument-select", prompt="Piano")
 
+            yield LabeledSlider("Volume:", value=100, id="volume-slider")
+
         with Container(id="centering-grid"):
             with Container(id="piano-area"):
                 with Container(id="piano-container"):
@@ -198,6 +216,19 @@ class PianoApp(App):
                             yield PianoKey(note, key_char, is_black=True, id=note_id)
         yield Footer()
 
-if __name__ == "__main__":
+# --- NEW: Typer CLI application setup ---
+cli = typer.Typer()
+
+@cli.command()
+def play():
+    """Launches the terminal piano application."""
     app = PianoApp()
     app.run()
+
+@cli.command()
+def version():
+    """Shows the version number."""
+    typer.echo("TermPiano version: 1.0.0")
+
+if __name__ == "__main__":
+    cli()
