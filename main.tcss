@@ -24,7 +24,6 @@
 /* --- NEW: Styles for the new controls --- */
 #sustain-switch { height: 3; width: auto; margin-left: 2; }
 #instrument-select { width: 100%; }
-#volume-slider { width: 100%; }
 
 /* --- Slider styles (from your provided code) --- */
 Slider { height: 3; }

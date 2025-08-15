@@ -1,5 +1,3 @@
-# main.py
-
 import os
 import time
 from textual.app import App, ComposeResult
@@ -49,40 +47,8 @@ NOTE_TO_MIDI = {
     "E6": 88, "F6": 89, "F#6": 90, "G6": 91, "G#6": 92, "A6": 93, "A#6": 94, "B6": 95, "C7": 96
 }
 
-# --- Copied from your provided code ---
-_NAKED_SLIDER = "╷         ╷         ╷\n├─┼─┼─┼─┼─┼─┼─┼─┼─┼─┤\n╵         ╵         ⵨"
-class Slider(Static):
-    position = reactive(0)
-    def __init__(self, position=0, **kwargs):
-        super().__init__(_NAKED_SLIDER, **kwargs)
-        self.position = position
-    def on_mount(self) -> None:
-        self.watch_position(self.position)
-    def watch_position(self, position: int) -> None:
-        self.styles.padding = (0, 0, 0, position)
-class LabeledSlider(Static):
-    value = reactive(0)
-    def __init__(self, label, value=100, value_range=(0, 127), id=""):
-        super().__init__(id=id)
-        self.label = label
-        self.min_value, self.max_value = value_range
-        self.value = value
-    def compose(self) -> ComposeResult:
-        initial_pos = self.value * 20 // (self.max_value - self.min_value)
-        yield Label(self.label)
-        yield Slider(position=initial_pos)
-    def on_key(self, event: Key) -> None:
-        slider = self.query_one(Slider)
-        if event.key == "left":
-            slider.position = max(0, slider.position - 1)
-        elif event.key == "right":
-            slider.position = min(20, slider.position + 1)
-        self.value = slider.position * (self.max_value - self.min_value) // 20
-# --- End of copied code ---
-
 
 class PianoKey(Static):
-    # This class is unchanged
     def __init__(self, note: str, keyboard_key: str, is_black: bool, **kwargs) -> None:
         super().__init__(keyboard_key, **kwargs)
         self.note = note
@@ -95,7 +61,7 @@ class PianoKey(Static):
 
 
 class PianoApp(App):
-    """An interactive terminal piano with more options."""
+    """An interactive terminal piano."""
     CSS_PATH = "main.tcss"
     KEY_MAP = {
         'z': "C3", 'x': "D3", 'c': "E3", 'v': "F3", 'b': "G3", 'n': "A3", 'm': "B3",
@@ -103,7 +69,6 @@ class PianoApp(App):
         '2': "C#3", '3': "D#3", '5': "F#3", '6': "G#3", '7': "A#3",
         'q': "C#4", 'w': "D#4", 'r': "F#4", 't': "G#4", 'y': "A#4",
     }
-    # --- UPDATED: Added Tab binding for sustain ---
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "toggle_sustain", "Sustain"),
@@ -114,99 +79,71 @@ class PianoApp(App):
     def __init__(self):
         super().__init__()
         self.fs = Synth()
+        self.fs.setting('synth.polyphony', 64)
         self.fs.start(driver='coreaudio')
         self.sfid = self.fs.sfload("assets/sounds/GeneralUser.sf2")
         self.fs.program_select(0, self.sfid, 0, 0)
-        self.fs.cc(0, 7, 100) # Set default volume to 100
-
-    # In main.py, inside the PianoApp class
+        self.held_keys = set()
 
     def watch_sustain_on(self, sustain_on: bool) -> None:
-        """Called automatically when sustain_on changes."""
-        # We are no longer telling the synth about sustain.
-        # We only care when sustain is turned OFF, so we can stop all notes.
         if not sustain_on:
             self.fs.all_notes_off(0)
 
-    # --- NEW: Event handlers for the new controls ---
     def on_switch_changed(self, event: Switch.Changed) -> None:
         if event.switch.id == "sustain-switch": self.sustain_on = event.value
     
-    # In main.py
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "instrument-select":
             program_id = event.value
-            
-            # --- FIX: If the blank prompt is selected, default to piano (ID 0) ---
             if program_id is Select.BLANK:
                 program_id = 0
-            
             self.fs.program_select(0, self.sfid, 0, program_id)
             self.fs.all_notes_off(0)
-        
 
-    def watch_labeled_slider_value(self, new_value: int) -> None:
-        # This is a special watcher that triggers when ANY LabeledSlider value changes.
-        # We find out which one by looking at the widget with the new value.
-        slider = self.get_widget_by_value(LabeledSlider, "value", new_value)
-        if slider.id == "volume-slider":
-            self.fs.cc(0, 7, new_value)
-
-    # --- NEW: Action for the Tab key binding ---
     def action_toggle_sustain(self) -> None:
         self.query_one("#sustain-switch", Switch).toggle()
 
     def on_key(self, event: Key) -> None:
-        # --- UPDATED: Stop Tab key's default focus-switching behavior ---
         if event.key == "tab":
             event.stop()
-            return
         if event.key in self.KEY_MAP:
             self.handle_player_note_press(self.KEY_MAP[event.key])
 
-    # In main.py, inside the PianoApp class
-
-    # In main.py, inside the PianoApp class
-
     def handle_player_note_press(self, note: str):
-        """Plays a note when the user presses a key or clicks."""
         midi_note = NOTE_TO_MIDI.get(note)
         if midi_note is None: return
 
-        # --- FIX #2: Immediately stop the note before playing it again ---
-        self.fs.noteoff(0, midi_note) 
-        
-        self.fs.noteon(0, midi_note, 100)
-        
-        # --- FIX #3: Always schedule the note to turn off, but vary the duration ---
-        duration = 2.0 if self.sustain_on else 0.5
-        self.set_timer(duration, lambda n=midi_note: self.fs.noteoff(0, n))
+        if midi_note in self.held_keys: return
 
-        # Visual flash for the key (this logic is unchanged)
+        self.held_keys.add(midi_note)
+        self.fs.noteon(0, midi_note, 100)
+
+        duration = 2.0 if self.sustain_on else 0.5
+
+        def note_off_and_release(n):
+            self.fs.noteoff(0, n)
+            self.held_keys.discard(n)
+
+        self.set_timer(duration, lambda n=midi_note: note_off_and_release(n))
+
         note_id = note.replace("#", "-sharp-")
         try:
             key_widget = self.query_one(f"#{note_id}", PianoKey)
             key_widget.add_class("key--pressed")
             self.set_timer(0.2, lambda k=key_widget: k.remove_class("key--pressed"))
-        except (NoMatches, NoMatchesError): pass
+        except (NoMatches, NoMatchesError):
+            pass
 
     def compose(self) -> ComposeResult:
         yield Header()
         
-        # --- UPDATED: Adding all new controls here ---
         with Horizontal(id="controls-container"):
-            # Sustain Switch
             yield Label("Sustain:")
             yield Switch(id="sustain-switch")
             
-            # Instrument Select
             instrument_options = [(name, i) for i, name in enumerate(GENERAL_MIDI_INSTRUMENTS)]
             yield Select(instrument_options, id="instrument-select", prompt="Piano")
 
-            # Volume Slider
-            yield LabeledSlider("Volume:", id="volume-slider")
-
-        # The rest of the layout is unchanged
         with Container(id="centering-grid"):
             with Container(id="piano-area"):
                 with Container(id="piano-container"):
