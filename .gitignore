@@ -1,6 +1,11 @@
 # Python virtual environment
 venv/
 
-# Python cache files
+# macOS specific files
+.DS_Store
+
+# Python cache and build files
 __pycache__/
-*.pyc
+build/
+dist/
+*.egg-info/

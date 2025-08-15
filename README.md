@@ -4,10 +4,10 @@ A playable piano that runs in your terminal.
 
 ## Installation
 
-To install the package for development, clone the repository and run:
+To install the package for development, run:
 
 ```bash
-pip install -e .
+pip install pianocli 
 ````
 
 ## Usage
