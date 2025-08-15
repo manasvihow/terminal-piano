@@ -1,7 +1,8 @@
 import os
 import time
 import typer
-from appdirs import user_data_dir
+import requests    
+from appdirs import user_data_dir 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.dom import NoMatches
@@ -18,7 +19,7 @@ _APP_DIR = os.path.dirname(__file__)
 APP_NAME = "PianoCLI"
 APP_AUTHOR = "Manasvi"
 SOUNDFONT_NAME = "GeneralUser.sf2"
-SOUNDFONT_URL = ""
+SOUNDFONT_URL = "https://github.com/manasvihow/terminal-piano/raw/main/assets/sounds/GeneralUser.sf2"
 
 DATA_DIR = user_data_dir(APP_NAME, APP_AUTHOR)
 SOUNDFONT_PATH = os.path.join(DATA_DIR, SOUNDFONT_NAME)
