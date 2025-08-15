@@ -61,20 +61,23 @@ class PianoKey(Static):
 
 
 class PianoApp(App):
-    """An interactive terminal piano."""
+    """An interactive terminal piano with octave shifting."""
     CSS_PATH = "main.tcss"
     KEY_MAP = {
         'z': "C3", 'x': "D3", 'c': "E3", 'v': "F3", 'b': "G3", 'n': "A3", 'm': "B3",
         'a': "C4", 's': "D4", 'd': "E4", 'f': "F4", 'g': "G4", 'h': "A4", 'j': "B4",
         '2': "C#3", '3': "D#3", '5': "F#3", '6': "G#3", '7': "A#3",
-        'q': "C#4", 'w': "D#4", 'r': "F#4", 't': "G#4", 'y': "A#4",
+        'w': "C#4", 'e': "D#4", 't': "F#4", 'y': "G#4", 'u': "A#4",
     }
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("tab", "toggle_sustain", "Sustain"),
+        ("up", "octave_up", "Octave +"),
+        ("down", "octave_down", "Octave -"),
     ]
 
     sustain_on = reactive(False)
+    octave_shift = reactive(0)
 
     def __init__(self):
         super().__init__()
@@ -84,6 +87,15 @@ class PianoApp(App):
         self.sfid = self.fs.sfload("assets/sounds/GeneralUser.sf2")
         self.fs.program_select(0, self.sfid, 0, 0)
         self.held_keys = set()
+        self.note_off_timers = {}
+
+    def watch_octave_shift(self, new_shift: int) -> None:
+        """Update the header to show the current octave shift."""
+        header = self.query_one(Header)
+        if new_shift == 0:
+            header.sub_title = ""
+        else:
+            header.sub_title = f"Octave Shift: {new_shift:+.0f}"
 
     def watch_sustain_on(self, sustain_on: bool) -> None:
         if not sustain_on:
@@ -100,6 +112,14 @@ class PianoApp(App):
             self.fs.program_select(0, self.sfid, 0, program_id)
             self.fs.all_notes_off(0)
 
+    def action_octave_up(self) -> None:
+        """Shifts the piano up by one octave."""
+        self.octave_shift += 1
+
+    def action_octave_down(self) -> None:
+        """Shifts the piano down by one octave."""
+        self.octave_shift -= 1
+
     def action_toggle_sustain(self) -> None:
         self.query_one("#sustain-switch", Switch).toggle()
 
@@ -110,12 +130,24 @@ class PianoApp(App):
             self.handle_player_note_press(self.KEY_MAP[event.key])
 
     def handle_player_note_press(self, note: str):
-        midi_note = NOTE_TO_MIDI.get(note)
-        if midi_note is None: return
+        """Plays a note, applying the current octave shift."""
+        note_name = note[:-1]
+        original_octave = int(note[-1])
+        shifted_octave = original_octave + self.octave_shift
+        shifted_note = f"{note_name}{shifted_octave}"
 
-        if midi_note in self.held_keys: return
+        midi_note = NOTE_TO_MIDI.get(shifted_note)
+        if midi_note is None: # The shifted note is off the piano
+            return
+        
+        if midi_note in self.held_keys:
+            return
 
         self.held_keys.add(midi_note)
+        
+        if midi_note in self.note_off_timers:
+            self.note_off_timers[midi_note].stop()
+
         self.fs.noteon(0, midi_note, 100)
 
         duration = 2.0 if self.sustain_on else 0.5
@@ -123,9 +155,16 @@ class PianoApp(App):
         def note_off_and_release(n):
             self.fs.noteoff(0, n)
             self.held_keys.discard(n)
+            if n in self.note_off_timers:
+                del self.note_off_timers[n]
 
-        self.set_timer(duration, lambda n=midi_note: note_off_and_release(n))
+        self.note_off_timers[midi_note] = self.set_timer(
+            duration, lambda n=midi_note: note_off_and_release(n)
+        )
 
+        self.set_timer(0.1, lambda n=midi_note: self.held_keys.discard(n))
+
+        # Visually flash the BASE key, not the shifted one
         note_id = note.replace("#", "-sharp-")
         try:
             key_widget = self.query_one(f"#{note_id}", PianoKey)

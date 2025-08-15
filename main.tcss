@@ -25,9 +25,6 @@
 #sustain-switch { height: 3; width: auto; margin-left: 2; }
 #instrument-select { width: 100%; }
 
-/* --- Slider styles (from your provided code) --- */
-Slider { height: 3; }
-Slider:focus { background: $primary-lighten-1; }
 
 
 /* Key styling is unchanged */
