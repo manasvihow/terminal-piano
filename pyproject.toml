@@ -16,7 +16,6 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-# --- UPDATED: Added requests and appdirs for downloading ---
 dependencies = [
     "textual",
     "pyfluidsynth",
@@ -32,6 +31,5 @@ pianocli = "pianocli.main:cli"
 package-dir = {"" = "src"}
 packages = ["pianocli"]
 
-# --- UPDATED: Only include the CSS file, NOT the soundfont ---
 [tool.setuptools.package-data]
 pianocli = ["*.tcss"]
